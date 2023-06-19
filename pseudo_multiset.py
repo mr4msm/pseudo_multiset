@@ -18,7 +18,10 @@ class BinaryIndexedTree:
 
         self.tree = self.data_to_tree(self.data)
         self.n = len(self.data)
-        self.pow2_le_n = 2**(self.n.bit_length() - 1)
+        if self.n == 0:
+            self.pow2_le_n = 0
+        else:
+            self.pow2_le_n = 1 << (self.n.bit_length() - 1)
 
     @staticmethod
     def data_to_tree(data: Sequence[Real]) -> List[Real]:
@@ -42,11 +45,12 @@ class BinaryIndexedTree:
             self.tree[i - 1] += x
             i += (i & -i)
 
-    def sum(self, i: Optional[int] = None) -> Real:
-        if i is None:
-            i = self.n
+    def sum(self, right: Optional[int] = None) -> Real:
+        """sum of [0, right)."""
+        if right is None:
+            right = self.n
 
-        i = min(i, self.n)
+        i = min(right, self.n)
         s = 0
         while i > 0:
             s += self.tree[i - 1]
@@ -54,8 +58,9 @@ class BinaryIndexedTree:
 
         return s
 
-    def interval_sum(self, a: int, b: Optional[int] = None) -> Real:
-        return self.sum(b) - self.sum(a)
+    def interval_sum(self, left: int, right: Optional[int] = None) -> Real:
+        """sum of [left, right)."""
+        return self.sum(right) - self.sum(left)
 
     def lower_bound(self, k: Real) -> int:
         if k <= 0:
@@ -67,7 +72,7 @@ class BinaryIndexedTree:
             if idx + pow2 <= self.n and self.tree[idx + pow2 - 1] < k:
                 k -= self.tree[idx + pow2 - 1]
                 idx += pow2
-            pow2 //= 2
+            pow2 >>= 1
 
         return idx
 
@@ -92,14 +97,27 @@ class PseudoMultiset:
     def __init__(
         self,
         elements: Union[Iterable[Hashable], Dict[Hashable, int]],
+        sort: bool = True,
     ) -> None:
         if isinstance(elements, dict):
-            self.elements = sorted(elements)
+            if sort:
+                self.elements = sorted(elements)
+            else:
+                self.elements = list(elements)
             data = [elements[key] for key in self.elements]
             self.bit = BinaryIndexedTree(data=data)
-            self.n = sum(data)
+            self.n = self.bit.sum()
         else:
-            self.elements = sorted(set(elements))
+            if sort:
+                self.elements = sorted(set(elements))
+            else:
+                self.elements = []
+                ele_set = set()
+                for ele in elements:
+                    if ele not in ele_set:
+                        ele_set.add(ele)
+                        self.elements.append(ele)
+
             self.bit = BinaryIndexedTree(len(self.elements))
             self.n = 0
 
@@ -164,12 +182,12 @@ class PseudoMultiset:
         return self.get_k_th_element(self.sum_le(x) + 1)
 
     @property
-    def min(self) -> Hashable:
-        return self.get_k_th_element(1)
-
-    @property
     def max(self) -> Hashable:
         return self.get_k_th_element(self.n)
+
+    @property
+    def min(self) -> Hashable:
+        return self.get_k_th_element(1)
 
     def to_dict(self) -> Dict[Hashable, int]:
         return {e: d for e, d in zip(self.elements, self.bit.data) if d > 0}
